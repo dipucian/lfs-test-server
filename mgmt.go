@@ -6,6 +6,8 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"path/filepath"
+	"os"
 
 	"github.com/GeertJohan/go.rice"
 	"github.com/gorilla/mux"
@@ -25,6 +27,7 @@ type pageData struct {
 
 func (a *App) addMgmt(r *mux.Router) {
 	r.HandleFunc("/mgmt", basicAuth(a.indexHandler)).Methods("GET")
+	r.HandleFunc("/mgmt/refresh", basicAuth(a.refreshHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/objects", basicAuth(a.objectsHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/users", basicAuth(a.usersHandler)).Methods("GET")
 	r.HandleFunc("/mgmt/add", basicAuth(a.addUserHandler)).Methods("POST")
@@ -78,6 +81,37 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	if err := render(w, "config.tmpl", pageData{Name: "index", Config: Config}); err != nil {
 		writeStatus(w, r, 404)
 	}
+}
+
+func (a *App) refreshHandler(w http.ResponseWriter, r *http.Request) {
+	logger.Log(kv{"method": "refreshHandler"})
+	logger.Log(kv{"ContentPath": Config.ContentPath})
+	basePath := Config.ContentPath
+	filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			logger.Log(kv{"path": path, "err": err})
+			return nil
+		}
+
+		if !info.IsDir() {
+			relPath, _ := filepath.Rel(basePath, path)
+			oid := relPath[0:2] + relPath[3:5] + relPath[6:len(relPath)]
+
+			meta := MetaObject{Oid: oid, Size: info.Size()}
+			err := a.metaStore.PutMetaObject(&meta)
+			if err != nil {
+				logger.Log(kv{"path": path, "size": info.Size(), "oid": oid, "err": err})
+			}
+		}
+
+		return nil
+	})
+	/*if err := render(w, "refresh.tmpl", pageData{Name: "index", Config: Config}); err != nil {
+		logger.Log(kv{"err": err})
+		writeStatus(w, r, 404)
+	}*/
+	w.WriteHeader(200)
+	fmt.Fprint(w, "refreshed")
 }
 
 func (a *App) objectsHandler(w http.ResponseWriter, r *http.Request) {
@@ -143,6 +177,7 @@ func render(w http.ResponseWriter, tmpl string, data pageData) error {
 
 	contentString, err := templateBox.String(tmpl)
 	if err != nil {
+		logger.Log(kv{"msg": tmpl + " not found", "err": err})
 		return err
 	}
 

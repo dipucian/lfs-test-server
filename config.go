@@ -12,11 +12,11 @@ import (
 // via tags.
 type Configuration struct {
 	Listen      string `config:"tcp://:8080"`
-	Host        string `config:"localhost:8080"`
-	MetaDB      string `config:"lfs.db"`
+	Host        string `config:"10.0.10.10:8080"`
+	MetaDB      string `config:"/home/vagrant/lfs.db"`
 	ContentPath string `config:"lfs-content"`
-	AdminUser   string `config:""`
-	AdminPass   string `config:""`
+	AdminUser   string `config:"admin"`
+	AdminPass   string `config:"admin"`
 	Cert        string `config:""`
 	Key         string `config:""`
 	Scheme      string `config:"http"`

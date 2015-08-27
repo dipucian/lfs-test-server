@@ -92,27 +92,8 @@ func (s *MetaStore) Put(v *RequestVars) (*MetaObject, error) {
 		return meta, nil
 	}
 
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
 	meta := MetaObject{Oid: v.Oid, Size: v.Size}
-	err := enc.Encode(meta)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(objectsBucket)
-		if bucket == nil {
-			return errNoBucket
-		}
-
-		err = bucket.Put([]byte(v.Oid), buf.Bytes())
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	err := s.PutMetaObject(&meta)
 
 	if err != nil {
 		return nil, err
@@ -121,8 +102,32 @@ func (s *MetaStore) Put(v *RequestVars) (*MetaObject, error) {
 	return &meta, nil
 }
 
+func (s *MetaStore) PutMetaObject(meta *MetaObject) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(meta)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(objectsBucket)
+		if bucket == nil {
+			return errNoBucket
+		}
+
+		err = bucket.Put([]byte(meta.Oid), buf.Bytes())
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
 // Close closes the underlying boltdb.
 func (s *MetaStore) Close() {
+	logger.Log(kv{"method": "Close"})
 	s.db.Close()
 }
 

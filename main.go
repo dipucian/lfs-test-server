@@ -84,7 +84,7 @@ func main() {
 
 	metaStore, err := NewMetaStore(Config.MetaDB)
 	if err != nil {
-		logger.Fatal(kv{"fn": "main", "err": "Could not open the meta store: " + err.Error()})
+		logger.Fatal(kv{"fn": "main", "err": "Could not open the meta store @"+Config.MetaDB+": " + err.Error()})
 	}
 
 	contentStore, err := NewContentStore(Config.ContentPath)
@@ -99,11 +99,16 @@ func main() {
 			sig := <-c
 			switch sig {
 			case syscall.SIGHUP: // Graceful shutdown
+				logger.Log(kv{"fn": "main", "msg": "Graceful shutdown"})
 				tl.Close()
+			default:
+				logger.Log(kv{"fn": "main", "sig": sig})
 			}
 		}
 	}(c, tl)
 
+	defer metaStore.Close()
+	
 	logger.Log(kv{"fn": "main", "msg": "listening", "pid": os.Getpid(), "addr": Config.Listen, "version": version})
 
 	app := NewApp(contentStore, metaStore)
